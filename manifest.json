@@ -1,0 +1,24 @@
+{
+  "manifest_version": 2,
+  "name": "Reset Search Defaults",
+  "applications": {
+    "gecko": {
+      "id": "reset-search-defaults@mozilla.com"
+    }
+  },
+  "version": "0.1",
+  "description": "Ask the user if they would like to use a specified search engine as the default.",
+  "experiment_apis": {
+    "search": {
+      "schema": "schema.json",
+      "parent": {
+        "scopes": ["addon_parent"],
+        "script": "api.js",
+        "events": ["startup"]
+      }
+    }
+  },
+  "icons": {
+    "64": "icon.png"
+  }
+}
