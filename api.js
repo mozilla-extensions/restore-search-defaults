@@ -22,10 +22,18 @@ ChromeUtils.defineModuleGetter(
   "resource:///modules/BrowserWindowTracker.jsm"
 );
 
+ChromeUtils.defineModuleGetter(
+  this,
+  "Preferences",
+  "resource://gre/modules/Preferences.jsm"
+);
+
 const { WebExtensionPolicy } = Cu.getGlobalForObject(Services);
 
 const DEFAULT_SEARCH_STORE_TYPE = "default_search";
 const DEFAULT_SEARCH_SETTING_NAME = "defaultSearch";
+
+const RUN_ONCE_PREF = "extensions.reset_default_search.runonce";
 
 // Basic testing:
 // Install a search engine (that asks to be set as default)
@@ -50,11 +58,14 @@ const lostEngines = new Map ([
 
 this.search = class extends ExtensionAPI {
   async onStartup() {
-    // Use self for the respond callback from the prompt.
-    let self = this;
-    async function uninstall() {
-      let addon = await AddonManager.getAddonByID(self.extension.id);
-      addon.uninstall();
+    let prefName = `${RUN_ONCE_PREF}.${this.extension.manifest.version}`;
+    // We only run this once, after which we bail out.
+    if (Preferences.get(prefName, false)) {
+      return;
+    }
+
+    function finish() {
+      Preferences.set(prefName, true);
     }
 
     // If the selected default is not the configured default for this region/locale, the
@@ -62,20 +73,21 @@ this.search = class extends ExtensionAPI {
     let defaultEngine = await Services.search.getDefault();
     let configuredDefault = await Services.search.originalDefaultEngine;
     if (defaultEngine.name !== configuredDefault.name) {
-      console.log(`==== The default engine was selected by the user.`);
-      uninstall();
+      console.log("reset-default-search: The default engine was already selected by the user.");
+      finish();
       return;
     }
 
     // Get the latest installed addon that was installed prior to it's failure date.
     let addons = (await AddonManager.getAddonsByIDs(
         Array.from(lostEngines.keys())
-      )).filter(
-        a => a && !a.userDisabled && a.installDate < lostEngines.get(a.id)
-      );
+      )).filter(a => {
+        let beforeDate = lostEngines.get(a.id);
+        return a && !a.userDisabled && (!beforeDate || a.installDate < beforeDate)
+      });
     if (!addons.length) {
-      console.log(`==== No addons in our list are installed.`);
-      uninstall();
+      console.log("reset-default-search: No addons in our list are installed.");
+      finish();
       return;
     }
 
@@ -84,11 +96,11 @@ this.search = class extends ExtensionAPI {
 
     addons.sort((a, b) => a.installDate - b.installDate);
     for (let addon of addons) {
-      console.log(`==== reset search engine to ${addon.id}`);
+      console.log(`reset-default-search: reset search engine to ${addon.id}`);
 
       let policy = WebExtensionPolicy.getByID(addon.id);
       if (!policy?.extension) {
-        console.log(`==== extension is not running`);
+        console.log("reset-default-search: extension is not running, cannot set as default");
         continue;
       }
       let { extension } = policy;
@@ -97,7 +109,7 @@ this.search = class extends ExtensionAPI {
       let searchProvider = manifest?.chrome_settings_overrides?.search_provider;
       if (!searchProvider?.is_default) {
         // If the extension isn't asking to be default at this point, bail out.
-        console.log(`==== isDefault is not in manifest`);
+        console.log("reset-default-search: is_default is not requested by the addon");
         continue;
       }
 
@@ -106,11 +118,11 @@ this.search = class extends ExtensionAPI {
       let engineName = searchProvider.name.trim();
       let engine = Services.search.getEngineByName(engineName);
       if (!engine) {
-        console.log(`==== engine is not configured in search`);
+        console.log("reset-default-search: engine is not configured in search");
         continue;
       }
 
-      console.log(`==== ask to set default search engine to ${addon.id}`);
+      console.log(`reset-default-search: ask user to set default search engine to ${addon.id}`);
       let window = BrowserWindowTracker.getTopWindow({ allowPopups: false });
       let subject = {
         wrappedJSObject: {
@@ -133,8 +145,8 @@ this.search = class extends ExtensionAPI {
                 engineName
               );
             }
-            // Now our work is done, remove ourselves.
-            uninstall();
+            // Remember that we have completed.
+            finish();
           },
         },
       };
@@ -142,11 +154,11 @@ this.search = class extends ExtensionAPI {
         subject,
         "webextension-defaultsearch-prompt"
       );
-      // We only prompt for the first addon that makes it here.  Exit onStartup
-      // so that we do not uninstall prematurely.
+      // We only prompt for the first addon that makes it here.  If the user does
+      // not respond to the panel, they will be asked again on next startup.
       return;
     }
     // If we made it here, no addon was eligible.
-    uninstall();
+    finish();
   }
 };
