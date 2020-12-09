@@ -3,7 +3,9 @@
   "name": "Reset Search Defaults",
   "applications": {
     "gecko": {
-      "id": "reset-search-defaults@mozilla.com"
+      "id": "reset-search-defaults@mozilla.com",
+      "strict_min_version": "83.0",
+      "strict_max_version": "86.0"
     }
   },
   "version": "1",

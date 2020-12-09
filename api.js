@@ -48,12 +48,46 @@ const RUN_ONCE_PREF = "extensions.reset_default_search.runonce";
 
 // map of ID -> Date in milliseconds for filtering (see other comments).
 //
-// new Date("Mon Nov 30 2020 13:37:55 GMT-0600")
+// Date.parse("Mon Nov 30 2020 13:37:55 GMT-0600")
 // Date.now()
 // 1606765841594
 
+const Feb2019 = Date.parse("2019-2-28");
+const Feb2020 = Date.parse("2020-2-28");
+const Oct2020 = Date.parse("2020-10-31");
+
 const lostEngines = new Map ([
-  ["{2451ecb9-6260-4564-a546-8532f04b587a}", Date.now()],
+  ["{2ef58672-740c-46bd-a50d-b9880986b574}", Feb2019],
+  ["{ecb03616-f3c2-4580-99dd-6a233047abdd}", Feb2019],
+  ["{8387ccbe-b9ac-438d-b049-c86b30a6dacb}", Feb2019],
+  ["{7ff51e81-f4b1-4682-9f45-43a771d80748}", Feb2019],
+  ["{820847ac-fb62-47a4-a6be-00d863584c76}", Feb2019],
+  ["{ec8513c5-2bcc-45b0-ae77-da6685cfafd9}", Feb2020],
+  ["{443305ec-55d7-411c-bb4a-96e83b4e631e}", Feb2020],
+  ["{25f17283-8325-42fb-812e-193c8de90b04}", Feb2020],
+  ["{43d20840-2895-4866-9d79-4f6f2ea537f7}", Feb2020],
+  ["{ff5dfca6-4e75-4882-a145-b58a4afc35a7}", Feb2020],
+  ["{4ae1f921-575e-4599-8b77-e8e7ab337860}", Feb2020],
+  ["{90e61a54-35d6-44c8-bb33-88623e6a03ae}", Feb2020],
+  ["{72dc5fd5-179b-40b6-9218-e88434939ed8}", Feb2020],
+  ["{57703f70-e1b7-462d-bf7e-657bac5eb30c}", Feb2020],
+  ["{f2ed910e-ab21-4ad3-a70a-8adca5e683f6}", Feb2020],
+  ["{8c1d6a6c-3745-429e-8ec5-2a374320e703}", Feb2020],
+  ["{c0d5c1cb-e676-4ff7-8189-793efc86fa2f}", Feb2020],
+  ["{f459049d-939d-432e-83c7-07ced47e629a}", Feb2020],
+  ["{2ff583b8-72a9-40bd-877b-b355ad33ce44}", Feb2020],
+  ["{2dcd1f94-6a18-47c3-826a-d8f1044b3ade}", Feb2020],
+  ["{f8890846-fcc1-479f-a90b-dce3e486b0ba}", Feb2020],
+  ["{8c9ec486-bd7b-40dd-ab49-1ca3ff452484}", Feb2020],
+  ["{3d66c55b-ed06-47fe-a823-d49301568ad3}", Oct2020],
+  ["{527d060d-9eaa-4670-8dea-7c152f0b8dcd}", Oct2020],
+  ["{ab64584a-98db-4661-b14a-d6286aed36b2}", Oct2020],
+  ["{b0a0f872-a93b-439d-a783-44690ee6ba4a}", Oct2020],
+  ["{fd299ce1-1602-4490-b659-f45504f9324c}", Oct2020],
+  ["{2451ecb9-6260-4564-a546-8532f04b587a}", Oct2020],
+  ["{0362578d-c9c2-4a85-8a37-eab60242c5bb}", Oct2020],
+  ["{39790485-930b-40a5-8268-69222363ff80}", Oct2020],
+  ["{446c7519-9e32-4f9a-b562-447f4421ec9a}", Oct2020],
 ]);
 
 this.search = class extends ExtensionAPI {
@@ -81,10 +115,12 @@ this.search = class extends ExtensionAPI {
     // Get the latest installed addon that was installed prior to it's failure date.
     let addons = (await AddonManager.getAddonsByIDs(
         Array.from(lostEngines.keys())
-      )).filter(a => {
-        let beforeDate = lostEngines.get(a.id);
-        return a && !a.userDisabled && (!beforeDate || a.installDate < beforeDate)
-      });
+      )).filter(
+        a => a &&
+        !a.userDisabled &&
+        lostEngines.has(a.id) &&
+        a.installDate < lostEngines.get(a.id)
+      );
     if (!addons.length) {
       console.log("reset-default-search: No addons in our list are installed.");
       finish();
@@ -94,7 +130,7 @@ this.search = class extends ExtensionAPI {
     // We will only ask for the latest installed engine.  We will
     // loop through the list until one of them makes it to the prompt.
 
-    addons.sort((a, b) => a.installDate - b.installDate);
+    addons.sort((a, b) => b.installDate - a.installDate);
     for (let addon of addons) {
       console.log(`reset-default-search: reset search engine to ${addon.id}`);
 
