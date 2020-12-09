@@ -7,14 +7,14 @@ also means that the panel will appear in the context of the currently selected t
 and may seem unassociated to what the user is currently doing when it runs.
 
 The addon ID's of the search engines that should be considered for an update must be added
-into the api.js file.  If a date is provided, the addon must have been installed prior to that
-date to be considered.  If multiple addons are included in the list, they will be sorted by their
-install date and we will check the latest installed first.  The first addon that passes several
-filters will be the one we ask the user to make default.  Any later addons will not be checked.
+into the api.js file.  The addon must have been installed prior to the date specified.  If
+multiple addons are included in the list, they will be sorted by their install date and we
+will check the latest installed first.  The first addon that passes several filters will be
+the one we ask the user to make default.  Any later addons will not be checked.
 
 ```javascript
 const lostEngines = new Map ([
-  ["mySearchEngine@example.com", Date.now("Mon Nov 30 2020 13:37:55 GMT-0600")],
+  ["mySearchEngine@example.com", Date.parse("Mon Nov 30 2020 13:37:55 GMT-0600")],
   ["anotherEngine@example.com", ],
 ]);
 ```
@@ -28,7 +28,7 @@ Several requirements are in place to avoid over-presenting the set-default panel
 
 1. The currently selected engine MUST be the default engine Firefox configures for the currently selected locale.
 2. The addon being checked MUST be enabled.
-3. If a date is provided, the addon MUST have been installed prior to that date.
+3. The addon MUST have been installed prior to the date configured for it.
 4. The addon MUST still have `is_default: true` in the manifest.  If it was updated at some point to remove that setting, it will not be considered.
 5. The addon MUST still be loaded by the search service.
 6. We limit this fix to Firefox versions 83 through 86 (can change or be updated if necessary).  If a user skips these versions they will not be presented the option to reset these defaults.
