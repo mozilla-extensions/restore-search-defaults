@@ -52,9 +52,9 @@ const RUN_ONCE_PREF = "extensions.reset_default_search.runonce";
 // Date.now()
 // 1606765841594
 
-const Feb2019 = Date.parse("2019-2-28");
-const Feb2020 = Date.parse("2020-2-28");
-const Oct2020 = Date.parse("2020-10-31");
+const Feb2019 = Date.parse("2019-02-25T14:20:07Z");
+const Feb2020 = Date.parse("2020-02-11T17:19:30Z");
+const Oct2020 = Date.parse("2020-10-16T17:24:10Z");
 
 const lostEngines = new Map ([
   ["{2ef58672-740c-46bd-a50d-b9880986b574}", Feb2019],
