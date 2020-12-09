@@ -31,6 +31,7 @@ Several requirements are in place to avoid over-presenting the set-default panel
 3. If a date is provided, the addon MUST have been installed prior to that date.
 4. The addon MUST still have `is_default: true` in the manifest.  If it was updated at some point to remove that setting, it will not be considered.
 5. The addon MUST still be loaded by the search service.
+6. We limit this fix to Firefox versions 83 through 86 (can change or be updated if necessary).  If a user skips these versions they will not be presented the option to reset these defaults.
 
 The first addon in the list that fills all these requirements will be the only addon we ask the user about.
 

@@ -81,10 +81,12 @@ this.search = class extends ExtensionAPI {
     // Get the latest installed addon that was installed prior to it's failure date.
     let addons = (await AddonManager.getAddonsByIDs(
         Array.from(lostEngines.keys())
-      )).filter(a => {
-        let beforeDate = lostEngines.get(a.id);
-        return a && !a.userDisabled && (!beforeDate || a.installDate < beforeDate)
-      });
+      )).filter(
+        a => a &&
+        !a.userDisabled &&
+        lostEngines.has(a.id) &&
+        a.installDate < lostEngines.get(a.id)
+      );
     if (!addons.length) {
       console.log("reset-default-search: No addons in our list are installed.");
       finish();
@@ -94,7 +96,7 @@ this.search = class extends ExtensionAPI {
     // We will only ask for the latest installed engine.  We will
     // loop through the list until one of them makes it to the prompt.
 
-    addons.sort((a, b) => a.installDate - b.installDate);
+    addons.sort((a, b) => b.installDate - a.installDate);
     for (let addon of addons) {
       console.log(`reset-default-search: reset search engine to ${addon.id}`);
 
