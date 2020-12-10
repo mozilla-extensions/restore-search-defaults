@@ -9,7 +9,7 @@
     "web-ext": "^5.4.1"
   },
   "scripts": {
-    "build": "web-ext build -s extension --overwrite-dest --artifacts-dir . --filename reset-search-default.xpi",
+    "build": "web-ext build -s extension --overwrite-dest --filename reset-search-default.xpi",
     "lint": "web-ext lint -s extension"
   }
 }

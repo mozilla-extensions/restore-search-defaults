@@ -69,5 +69,5 @@ TODO: how to test the blocklist date.
 ## Development
 
 * Install needed tools with `yarn install`.
-* Build an XPI with `yarn build`. The XPI will be `reset-search-default.xpi` in the repository root.
+* Build an XPI with `yarn build`. The XPI will be at `web-ext-artifacts/reset-search-default.xpi`.
 * Run extension lints with `yarn lint`.
