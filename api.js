@@ -33,7 +33,9 @@ const { WebExtensionPolicy } = Cu.getGlobalForObject(Services);
 const DEFAULT_SEARCH_STORE_TYPE = "default_search";
 const DEFAULT_SEARCH_SETTING_NAME = "defaultSearch";
 
-const RUN_ONCE_PREF = "extensions.reset_default_search.runonce";
+// The value at the end of this pref must be itterated if we want
+// the prompt to run again after an addon update.
+const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.1";
 
 // Basic testing:
 // Install a search engine (that asks to be set as default)
@@ -92,14 +94,13 @@ const lostEngines = new Map ([
 
 this.search = class extends ExtensionAPI {
   async onStartup() {
-    let prefName = `${RUN_ONCE_PREF}.${this.extension.manifest.version}`;
     // We only run this once, after which we bail out.
-    if (Preferences.get(prefName, false)) {
+    if (Preferences.get(RUN_ONCE_PREF, false)) {
       return;
     }
 
     function finish() {
-      Preferences.set(prefName, true);
+      Preferences.set(RUN_ONCE_PREF, true);
     }
 
     // If the selected default is not the configured default for this region/locale, the
@@ -112,12 +113,15 @@ this.search = class extends ExtensionAPI {
       return;
     }
 
-    // Get the latest installed addon that was installed prior to it's failure date.
+    // Get the latest installed addon that was installed prior to it's failure date.  Any non-app
+    // disabled state (ie. it is not disabled due to blocklisting) removes the addon from elibility.
     let addons = (await AddonManager.getAddonsByIDs(
         Array.from(lostEngines.keys())
       )).filter(
         a => a &&
         !a.userDisabled &&
+        !a.softDisabled &&
+        !a.embedderDisabled &&
         lostEngines.has(a.id) &&
         a.installDate < lostEngines.get(a.id)
       );
@@ -127,11 +131,13 @@ this.search = class extends ExtensionAPI {
       return;
     }
 
+    // Filter out any that are blocklisted.
+    let enabledAddons = addons.filter(a => !a.appDisabled);
+
     // We will only ask for the latest installed engine.  We will
     // loop through the list until one of them makes it to the prompt.
-
-    addons.sort((a, b) => b.installDate - a.installDate);
-    for (let addon of addons) {
+    enabledAddons.sort((a, b) => b.installDate - a.installDate);
+    for (let addon of enabledAddons) {
       console.log(`reset-default-search: reset search engine to ${addon.id}`);
 
       let policy = WebExtensionPolicy.getByID(addon.id);
@@ -194,7 +200,11 @@ this.search = class extends ExtensionAPI {
       // not respond to the panel, they will be asked again on next startup.
       return;
     }
-    // If we made it here, no addon was eligible.
-    finish();
+    // If we made it here, no addon was currently eligible.  If any addons were
+    // blocklsited we will want to be able to prompt when it is released from
+    // the blocklist.
+    if (enabledAddons.length == addons.length) {
+      finish();
+    }
   }
 };
