@@ -66,3 +66,8 @@ The above does not test the date aspect of this addon.  The date should be the t
 
 TODO: how to test the blocklist date.
 
+## Development
+
+* Install needed tools with `yarn install`.
+* Build an XPI with `yarn build`. The XPI will be `reset-search-default.xpi` in the repository root.
+* Run extension lints with `yarn lint`.
