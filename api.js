@@ -33,7 +33,7 @@ const { WebExtensionPolicy } = Cu.getGlobalForObject(Services);
 const DEFAULT_SEARCH_STORE_TYPE = "default_search";
 const DEFAULT_SEARCH_SETTING_NAME = "defaultSearch";
 
-// The value at the end of this pref must be itterated if we want
+// The value at the end of this pref must be incremented if we want
 // the prompt to run again after an addon update.
 const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.1";
 
@@ -201,7 +201,7 @@ this.search = class extends ExtensionAPI {
       return;
     }
     // If we made it here, no addon was currently eligible.  If any addons were
-    // blocklsited we will want to be able to prompt when it is released from
+    // blocklisted we will want to be able to prompt when it is released from
     // the blocklist.
     if (enabledAddons.length == addons.length) {
       finish();
