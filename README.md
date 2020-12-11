@@ -20,7 +20,7 @@ const lostEngines = new Map ([
 ```
 
 A pref is used to prevent the addon running more than once per version.  Consecutive releases of the
-addon must increment the version in the manifest or it may not run again.
+addon must increment the version in the preference name in api.js.
 
 ### filters that prevent the panel from appearing
 
@@ -34,6 +34,8 @@ Several requirements are in place to avoid over-presenting the set-default panel
 6. We limit this fix to Firefox versions 83 through 86 (can change or be updated if necessary).  If a user skips these versions they will not be presented the option to reset these defaults.
 
 The first addon in the list that fills all these requirements will be the only addon we ask the user about.
+If there were addons installed in the list, but none are currently elligable to prompt for, we will not set
+the "disable" pref and run again on the next startup.
 
 ## Simple testing to restore a blocklisted addon
 
@@ -46,7 +48,7 @@ addon helps to offer that to the user.
 4. re-enable the blocklist and verify that the addon is now blocklisted.
 5. install the updated addon
 6. restart Firefox
-7. install this addon (be sure to enter the addon ID, but leave the date undefined or use `Date.now()`)
+7. install this addon
 
 The panel should appear asking to set the addon as the default search engine.  The test should be done three times:
 
