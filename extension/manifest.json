@@ -19,8 +19,5 @@
         "events": ["startup"]
       }
     }
-  },
-  "icons": {
-    "64": "icon.png"
   }
 }
