@@ -57,6 +57,7 @@ const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.1";
 const Feb2019 = Date.parse("2019-02-25T14:20:07Z");
 const Feb2020 = Date.parse("2020-02-11T17:19:30Z");
 const Oct2020 = Date.parse("2020-10-16T17:24:10Z");
+const Dec2020 = Date.parse("2020-12-16T00:00:00Z");
 
 const lostEngines = new Map ([
   ["{2ef58672-740c-46bd-a50d-b9880986b574}", Feb2019],
@@ -90,6 +91,7 @@ const lostEngines = new Map ([
   ["{0362578d-c9c2-4a85-8a37-eab60242c5bb}", Oct2020],
   ["{39790485-930b-40a5-8268-69222363ff80}", Oct2020],
   ["{446c7519-9e32-4f9a-b562-447f4421ec9a}", Oct2020],
+  ["{b30e775a-7a10-480d-ace4-761b9ca07aee}", Dec2020],  // Test add-on
 ]);
 
 this.search = class extends ExtensionAPI {
