@@ -4,11 +4,11 @@
   "applications": {
     "gecko": {
       "id": "reset-search-defaults@mozilla.com",
-      "strict_min_version": "83.0",
+      "strict_min_version": "81.0",
       "strict_max_version": "86.0"
     }
   },
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Ask the user if they would like to use a specified search engine as the default.",
   "experiment_apis": {
     "search": {
