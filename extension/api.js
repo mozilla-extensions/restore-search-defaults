@@ -37,6 +37,20 @@ const DEFAULT_SEARCH_SETTING_NAME = "defaultSearch";
 // the prompt to run again after an addon update.
 const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.1";
 
+// Telemetry recorded:
+// The category is always defaultSearchReset
+// events:
+// - skipped: the panel was not shown
+//   - user-selected-default: a default engine is user selected already
+//   - no-addons-enabled: none of the addons are installed or enabled
+//   - no-addons-eligible: addon is not running or configured to be default
+// - open: the panel was requested to be shown, this does not promise a response
+//   - the id of the extension is provided in the event details
+// - selected: the user responded to the panel
+//   - allow: the user selected the engine to become default
+//   - decline: the user declined to set the engine as default
+//   - the id of the extension is provided in the event details
+
 // Basic testing:
 // Install a search engine (that asks to be set as default)
 // ensure configured default engine is selected
@@ -101,8 +115,20 @@ this.search = class extends ExtensionAPI {
       return;
     }
 
-    function finish() {
+    function finish(event, reason, id) {
       Preferences.set(RUN_ONCE_PREF, true);
+      try {
+        Services.telemetry.recordEvent(
+          "defaultSearchReset", //category
+          event, // event
+          reason,
+          id
+        );
+      } catch (err) {
+        // If the telemetry throws just log the error so it doesn't break any
+        // functionality.
+        Cu.reportError(err);
+      }
     }
 
     // If the selected default is not the configured default for this region/locale, the
@@ -111,7 +137,7 @@ this.search = class extends ExtensionAPI {
     let configuredDefault = await Services.search.originalDefaultEngine;
     if (defaultEngine.name !== configuredDefault.name) {
       console.log("reset-default-search: The default engine was already selected by the user.");
-      finish();
+      finish("skipped", "user-selected-default");
       return;
     }
 
@@ -129,7 +155,7 @@ this.search = class extends ExtensionAPI {
       );
     if (!addons.length) {
       console.log("reset-default-search: No addons in our list are installed.");
-      finish();
+      finish("skipped", "no-addons-enabled");
       return;
     }
 
@@ -190,7 +216,7 @@ this.search = class extends ExtensionAPI {
               );
             }
             // Remember that we have completed.
-            finish();
+            finish("selected", allow ? "allow" : "decline", extension.id);
           },
         },
       };
@@ -198,6 +224,18 @@ this.search = class extends ExtensionAPI {
         subject,
         "webextension-defaultsearch-prompt"
       );
+      try {
+        Services.telemetry.recordEvent(
+          "defaultSearchReset",
+          "open",
+          "ask",
+          extension.id
+        );
+      } catch (err) {
+        // If the telemetry throws just log the error so it doesn't break any
+        // functionality.
+        Cu.reportError(err);
+      }
       // We only prompt for the first addon that makes it here.  If the user does
       // not respond to the panel, they will be asked again on next startup.
       return;
@@ -206,7 +244,7 @@ this.search = class extends ExtensionAPI {
     // blocklisted we will want to be able to prompt when it is released from
     // the blocklist.
     if (enabledAddons.length == addons.length) {
-      finish();
+      finish("skipped", "no-addons-eligible");
     }
   }
 };
