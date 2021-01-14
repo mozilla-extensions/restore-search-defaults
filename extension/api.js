@@ -41,15 +41,14 @@ const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.1";
 // The category is always defaultSearchReset
 // events:
 // - skipped: the panel was not shown
-//   - user-selected-default: a default engine is user selected already
-//   - no-addons-enabled: none of the addons are installed or enabled
-//   - no-addons-eligible: addon is not running or configured to be default
-// - open: the panel was requested to be shown, this does not promise a response
-//   - the id of the extension is provided in the event details
-// - selected: the user responded to the panel
-//   - allow: the user selected the engine to become default
-//   - decline: the user declined to set the engine as default
-//   - the id of the extension is provided in the event details
+//   - userSelectedDefault: a default engine is user selected already
+//   - noAddonsEnabled: none of the addons are installed or enabled
+//   - noAddonsEligible: addon is not running or configured to be default
+// - interaction: the panel is shown or the user interacts
+//   - ask: the panel was requested to be shown, this does not promise a response
+//   - accepted: the user selected the engine to become default
+//   - denied: the user declined to set the engine as default
+//     - the id of the extension is provided in the event value for all interaction events
 
 // Basic testing:
 // Install a search engine (that asks to be set as default)
@@ -114,8 +113,28 @@ this.search = class extends ExtensionAPI {
     if (Preferences.get(RUN_ONCE_PREF, false)) {
       return;
     }
+    Services.telemetry.registerEvents("defaultSearchReset", {
+      skipped: {
+        methods: ["skipped"],
+        objects: [
+          "userSelectedDefault",
+          "noAddonsEnabled",
+          "noAddonsEligible",
+        ],
+        record_on_release: true,
+      },
+      interaction: {
+        methods: ["interaction"],
+        objects: [
+          "accepted",
+          "denied",
+          "ask",
+        ],
+        record_on_release: true,
+      },
+    });
 
-    function finish(event, reason, id) {
+    function finish(event, reason, id = null) {
       Preferences.set(RUN_ONCE_PREF, true);
       try {
         Services.telemetry.recordEvent(
@@ -137,7 +156,7 @@ this.search = class extends ExtensionAPI {
     let configuredDefault = await Services.search.originalDefaultEngine;
     if (defaultEngine.name !== configuredDefault.name) {
       console.log("reset-default-search: The default engine was already selected by the user.");
-      finish("skipped", "user-selected-default");
+      finish("skipped", "userSelectedDefault");
       return;
     }
 
@@ -155,7 +174,7 @@ this.search = class extends ExtensionAPI {
       );
     if (!addons.length) {
       console.log("reset-default-search: No addons in our list are installed.");
-      finish("skipped", "no-addons-enabled");
+      finish("skipped", "noAddonsEnabled");
       return;
     }
 
@@ -216,7 +235,7 @@ this.search = class extends ExtensionAPI {
               );
             }
             // Remember that we have completed.
-            finish("selected", allow ? "allow" : "decline", extension.id);
+            finish("interaction", allow ? "accepted" : "denied", extension.id);
           },
         },
       };
@@ -227,7 +246,7 @@ this.search = class extends ExtensionAPI {
       try {
         Services.telemetry.recordEvent(
           "defaultSearchReset",
-          "open",
+          "interaction",
           "ask",
           extension.id
         );
@@ -244,7 +263,7 @@ this.search = class extends ExtensionAPI {
     // blocklisted we will want to be able to prompt when it is released from
     // the blocklist.
     if (enabledAddons.length == addons.length) {
-      finish("skipped", "no-addons-eligible");
+      finish("skipped", "noAddonsEligible");
     }
   }
 };
