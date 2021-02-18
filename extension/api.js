@@ -35,7 +35,7 @@ const DEFAULT_SEARCH_SETTING_NAME = "defaultSearch";
 
 // The value at the end of this pref must be incremented if we want
 // the prompt to run again after an addon update.
-const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.1";
+const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.2";
 
 // Basic testing:
 // Install a search engine (that asks to be set as default)
@@ -125,6 +125,10 @@ this.search = class extends ExtensionAPI {
     // Filter out any that are blocklisted.
     let enabledAddons = addons.filter(a => !a.appDisabled);
 
+    // If the extension is not running or enabled in the search service
+    // we will try again later.
+    let tryagain = false;
+
     // We will only ask for the latest installed engine.  We will
     // loop through the list until one of them makes it to the prompt.
     enabledAddons.sort((a, b) => b.installDate - a.installDate);
@@ -133,6 +137,7 @@ this.search = class extends ExtensionAPI {
 
       let policy = WebExtensionPolicy.getByID(addon.id);
       if (!policy?.extension) {
+        tryagain = true;
         console.log("reset-default-search: extension is not running, cannot set as default");
         continue;
       }
@@ -151,6 +156,7 @@ this.search = class extends ExtensionAPI {
       let engineName = searchProvider.name.trim();
       let engine = Services.search.getEngineByName(engineName);
       if (!engine) {
+        tryagain = true;
         console.log("reset-default-search: engine is not configured in search");
         continue;
       }
@@ -194,7 +200,7 @@ this.search = class extends ExtensionAPI {
     // If we made it here, no addon was currently eligible.  If any addons were
     // blocklisted we will want to be able to prompt when it is released from
     // the blocklist.
-    if (enabledAddons.length == addons.length) {
+    if (!tryagain && enabledAddons.length == addons.length) {
       finish();
     }
   }
