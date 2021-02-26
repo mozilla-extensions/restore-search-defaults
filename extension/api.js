@@ -22,12 +22,6 @@ ChromeUtils.defineModuleGetter(
   "resource:///modules/BrowserWindowTracker.jsm"
 );
 
-ChromeUtils.defineModuleGetter(
-  this,
-  "Preferences",
-  "resource://gre/modules/Preferences.jsm"
-);
-
 const { WebExtensionPolicy } = Cu.getGlobalForObject(Services);
 
 const DEFAULT_SEARCH_STORE_TYPE = "default_search";
@@ -35,7 +29,10 @@ const DEFAULT_SEARCH_SETTING_NAME = "defaultSearch";
 
 // The value at the end of this pref must be incremented if we want
 // the prompt to run again after an addon update.
-const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.2";
+// If the value exists, we have ran before and will not run again.  If
+// we showed the panel, the value will be true.  We do not track what
+// the result of showing the panel is (ie. the user accepted or not).
+const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.3";
 
 // Basic testing:
 // Install a search engine (that asks to be set as default)
@@ -86,12 +83,21 @@ const lostEngines = new Map ([
 this.search = class extends ExtensionAPI {
   async onStartup() {
     // We only run this once, after which we bail out.
-    if (Preferences.get(RUN_ONCE_PREF, false)) {
+    if (Services.prefs.prefHasUserValue(RUN_ONCE_PREF)) {
       return;
     }
+    Services.telemetry.registerEvents("defaultSearchReset", {
+      interaction: {
+        methods: ["interaction"],
+        objects: [
+          "panelShown",
+        ],
+        record_on_release: true,
+      },
+    });
 
-    function finish() {
-      Preferences.set(RUN_ONCE_PREF, true);
+    function finish(result = false) {
+      Services.prefs.setBoolPref(RUN_ONCE_PREF, result);
     }
 
     // If the selected default is not the configured default for this region/locale, the
@@ -184,8 +190,21 @@ this.search = class extends ExtensionAPI {
                 engineName
               );
             }
+
+            try {
+              Services.telemetry.recordEvent(
+                "defaultSearchReset",
+                "interaction",
+                "panelShown",
+                extension.id
+              );
+            } catch (err) {
+              // If the telemetry throws just log the error so it doesn't break any
+              // functionality.
+              Cu.reportError(err);
+            }
             // Remember that we have completed.
-            finish();
+            finish(true);
           },
         },
       };
