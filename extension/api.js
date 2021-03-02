@@ -196,7 +196,8 @@ this.search = class extends ExtensionAPI {
                 "defaultSearchReset",
                 "interaction",
                 "panelShown",
-                extension.id
+                null,
+                { addon_id: extension.id }
               );
             } catch (err) {
               // If the telemetry throws just log the error so it doesn't break any
