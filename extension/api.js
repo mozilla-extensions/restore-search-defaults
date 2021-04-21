@@ -124,6 +124,18 @@ async function tryDefaultReset() {
     return;
   }
 
+  // Make sure the setting is not user controlled.
+  let control = await ExtensionSettingsStore.getLevelOfControl(
+    ExtensionSettingsStore.SETTING_USER_SET,
+    DEFAULT_SEARCH_STORE_TYPE,
+    DEFAULT_SEARCH_SETTING_NAME
+  );
+  if (control == "controlled_by_this_extension") {
+    console.log(`reset-default-search: search control has been user selected, not resetting, finished.`)
+    finish();
+    return;
+  }
+
   // Get the latest installed addon that was installed prior to it's failure date.  Any non-app
   // disabled state (ie. it is not disabled due to blocklisting) removes the addon from elibility.
   let addons = (await AddonManager.getAddonsByIDs(
@@ -151,18 +163,6 @@ async function tryDefaultReset() {
   enabledAddons.sort((a, b) => b.installDate - a.installDate);
   for (let addon of enabledAddons) {
     console.log(`reset-default-search: reset search engine to ${addon.id}`);
-
-    // Make sure the extension could control the setting.
-    let control = await ExtensionSettingsStore.getLevelOfControl(
-      addon.id,
-      DEFAULT_SEARCH_STORE_TYPE,
-      DEFAULT_SEARCH_SETTING_NAME
-    );
-    if (control == "not_controllable") {
-      console.log(`reset-default-search: search control has been user selected, not resetting, finished.`)
-      finish();
-      return;
-    }
 
     let policy = WebExtensionPolicy.getByID(addon.id);
     if (!policy?.extension) {
