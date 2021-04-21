@@ -112,15 +112,27 @@ const lostEngines = new Map ([
 // we will try again later.
 let tryagain = false;
 
-function finish(result = false) {
-  Services.prefs.setBoolPref(RUN_ONCE_PREF, result);
+function finish(result = false, event, reason, id = null) {
+  Preferences.set(RUN_ONCE_PREF, result);
+  try {
+    Services.telemetry.recordEvent(
+      "defaultSearchReset", //category
+      event, // event
+      reason,
+      id
+    );
+  } catch (err) {
+    // If the telemetry throws just log the error so it doesn't break any
+    // functionality.
+    Cu.reportError(err);
+  }
 }
 
 async function tryDefaultReset() {
   let defaultEngine = await Services.search.getDefault();
   if (lostEngines.has(defaultEngine?._extensionID)) {
     console.log(`reset-default-search: The default engine was already selected by the user. ${defaultEngine._extensionID}`);
-    finish(true);
+    finish(true, "skipped", "alreadyDefault");
     return;
   }
 
@@ -131,8 +143,8 @@ async function tryDefaultReset() {
     DEFAULT_SEARCH_SETTING_NAME
   );
   if (control == "controlled_by_this_extension") {
-    console.log(`reset-default-search: search control has been user selected, not resetting, finished.`)
-    finish();
+    console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
+    finish(false, "skipped", "userSelectedDefault");
     return;
   }
 
@@ -150,7 +162,7 @@ async function tryDefaultReset() {
     );
   if (!addons.length) {
     console.log("reset-default-search: No addons in our list are installed.");
-    finish();
+    finish(false, "skipped", "noAddonsEnabled");
     return;
   }
 
@@ -219,20 +231,8 @@ async function tryDefaultReset() {
             );
           }
 
-          try {
-            Services.telemetry.recordEvent(
-              "defaultSearchReset",
-              "interaction",
-              "panelShown",
-              extension.id
-            );
-          } catch (err) {
-            // If the telemetry throws just log the error so it doesn't break any
-            // functionality.
-            Cu.reportError(err);
-          }
           // Remember that we have completed.
-          finish(true);
+          finish(true, "interaction", allow ? "accepted" : "denied", extension.id);
         },
       },
     };
@@ -240,6 +240,20 @@ async function tryDefaultReset() {
       subject,
       "webextension-defaultsearch-prompt"
     );
+
+    try {
+      Services.telemetry.recordEvent(
+        "defaultSearchReset",
+        "interaction",
+        "ask",
+        extension.id
+      );
+    } catch (err) {
+      // If the telemetry throws just log the error so it doesn't break any
+      // functionality.
+      Cu.reportError(err);
+    }
+
     // We only prompt for the first addon that makes it here.  If the user does
     // not respond to the panel, they will be asked again on next startup.
     return;
@@ -250,7 +264,7 @@ async function tryDefaultReset() {
   tryagain = tryagain || enabledAddons.length < addons.length;
   if (!tryagain) {
     console.log("reset-default-search: no enabled addons fit the criteria, finished.");
-    finish();
+    finish(false, "skipped", "noAddonsEligible");
   }
   console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
 }
@@ -265,23 +279,37 @@ this.search = class extends ExtensionAPI {
       return;
     }
 
+    Services.telemetry.registerEvents("defaultSearchReset", {
+      skipped: {
+        methods: ["skipped"],
+        objects: [
+          "alreadyDefault",
+          "noAddonsEnabled",
+          "noAddonsEligible",
+          "previousRun",
+          "userSelectedDefault",
+        ],
+        record_on_release: true,
+      },
+      interaction: {
+        methods: ["interaction"],
+        objects: [
+          "accepted",
+          "denied",
+          "ask",
+        ],
+        record_on_release: true,
+      },
+    });
+
     // Previous pref is true if the user saw the panel. Some criteria have been
     // slighly adjusted so those that did not previously see the panel will get
     // another try.
     if (Services.prefs.getBoolPref(PREVIOUS_PREF, false)) {
       console.log("reset-default-search: has already ran once and saw panel, exit.");
+      finish(false, "skipped", "previousRun")
       return;
     }
-
-    Services.telemetry.registerEvents("defaultSearchReset", {
-      interaction: {
-        methods: ["interaction"],
-        objects: [
-          "panelShown",
-        ],
-        record_on_release: true,
-      },
-    });
 
     // Ensure everything is started if this is an APP startup.
     await searchInitialized;
