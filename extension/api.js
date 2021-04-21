@@ -105,7 +105,7 @@ const lostEngines = new Map ([
   ["{39790485-930b-40a5-8268-69222363ff80}", Oct2020],
   ["{446c7519-9e32-4f9a-b562-447f4421ec9a}", Oct2020],
   ["{b30e775a-7a10-480d-ace4-761b9ca07aee}", Dec2020],  // Test add-on
-  ["{fd299ce1-1602-4490-b659-f45504f9324c}", Date.now()], // Manual test addon for dev.
+  // ["{fd299ce1-1602-4490-b659-f45504f9324c}", Date.now()], // Manual test addon for dev.
 ]);
 
 // If the extension is not running or enabled in the search service
