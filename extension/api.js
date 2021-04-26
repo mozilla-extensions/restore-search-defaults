@@ -129,22 +129,11 @@ function finish(result = false, event, reason, id = null) {
 }
 
 async function tryDefaultReset() {
+  await searchInitialized;
   let defaultEngine = await Services.search.getDefault();
   if (lostEngines.has(defaultEngine?._extensionID)) {
     console.log(`reset-default-search: The default engine was already selected by the user. ${defaultEngine._extensionID}`);
     finish(true, "skipped", "alreadyDefault");
-    return;
-  }
-
-  // Make sure the setting is not user controlled.
-  let control = await ExtensionSettingsStore.getLevelOfControl(
-    ExtensionSettingsStore.SETTING_USER_SET,
-    DEFAULT_SEARCH_STORE_TYPE,
-    DEFAULT_SEARCH_SETTING_NAME
-  );
-  if (control == "controlled_by_this_extension") {
-    console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
-    finish(false, "skipped", "userSelectedDefault");
     return;
   }
 
@@ -166,9 +155,22 @@ async function tryDefaultReset() {
     return;
   }
 
+  // Make sure the setting is not user controlled.
+  await ExtensionSettingsStore.initialize();
+  let control = await ExtensionSettingsStore.getLevelOfControl(
+    ExtensionSettingsStore.SETTING_USER_SET,
+    DEFAULT_SEARCH_STORE_TYPE,
+    DEFAULT_SEARCH_SETTING_NAME
+  );
+  if (control == "controlled_by_this_extension") {
+    console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
+    finish();
+    return;
+  }
+
   // Filter out any that are blocklisted.
   let enabledAddons = addons.filter(a => !a.appDisabled);
-  console.log(`enabledAddons ${enabledAddons.length}`);
+  console.log(`reset-default-search: enabled and eligible addons ${enabledAddons.length}`);
 
   // We will only ask for the latest installed engine.  We will
   // loop through the list until one of them makes it to the prompt.
@@ -195,13 +197,13 @@ async function tryDefaultReset() {
     let engineName = searchProvider.name.trim();
     if (!Services.search.getEngineByName(engineName)) {
       // attempt to load the engine, but if it fails then we'll try again later.
-      console.log(`reset-default-search: engine is not configured in search, try adding ${policy.extension.id}`);
+      console.log(`reset-default-search: engine is not configured in search, try adding ${addon.id}`);
       // "default" here is about the locale, not default setting.  We dig into search service here due
       // to a bug (fixed in 89) that prevents using addEnginesFromExtension for updates.
       await Services.search.wrappedJSObject._installExtensionEngine(extension, ["default"]);
       if (!Services.search.getEngineByName(engineName)) {
         tryagain = true;
-        console.log(`reset-default-search: could not configure ${policy.extension.id} in search, try again later`);
+        console.log(`reset-default-search: could not configure ${addon.id} in search, try again later`);
         continue;
       }
     }
@@ -269,8 +271,30 @@ async function tryDefaultReset() {
   console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
 }
 
+let _running = false;
+function runDefaultReset() {
+  if (_running) {
+    return;
+  }
+  _running = true;
+  tryDefaultReset()
+    .then(() => {
+      if (!tryagain) {
+        Management.off("ready", tryUpdate);
+      }
+    }).finally(() => {
+      _running = false;
+    });
+}
+
+function tryUpdate(e, { id }) {
+  if (lostEngines.has(id)) {
+    runDefaultReset();
+  }
+}
+
 this.search = class extends ExtensionAPI {
-  async onStartup() {
+  onStartup() {
     console.log("reset-default-search: starting.");
 
     // We only run this once, after which we bail out.
@@ -311,25 +335,13 @@ this.search = class extends ExtensionAPI {
       return;
     }
 
-    // Ensure everything is started if this is an APP startup.
-    await searchInitialized;
-    await ExtensionSettingsStore.initialize();
-
-    await tryDefaultReset();
-    if (!tryagain) {
-      return;
-    }
-
     // Addons have not started when "update" is emitted, so we wait for "ready" to
     // indicate the startup of an addon during the session.
-    Management.on("ready", async function tryUpdate(e, { id, resourceURI }) {
-      if (!lostEngines.has(id)) {
-        return;
-      }
-      await tryDefaultReset();
-      if (!tryagain) {
-        Management.off("ready", tryUpdate);
-      }
-    });
+    Management.on("ready", tryUpdate);
+    runDefaultReset();
+  }
+
+  onShutdown() {
+    Management.off("ready", tryUpdate);
   }
 };
