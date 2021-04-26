@@ -112,8 +112,8 @@ const lostEngines = new Map ([
 // we will try again later.
 let tryagain = false;
 
-function finish(result = false, event, reason, id = null) {
-  Preferences.set(RUN_ONCE_PREF, result);
+function finish(result, event, reason, id = null) {
+  Services.prefs.setBoolPref(RUN_ONCE_PREF, result);
   try {
     Services.telemetry.recordEvent(
       "defaultSearchReset", //category
@@ -164,7 +164,7 @@ async function tryDefaultReset() {
   );
   if (control == "controlled_by_this_extension") {
     console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
-    finish();
+    finish(false, "skipped", "userSelectedDefault");
     return;
   }
 
