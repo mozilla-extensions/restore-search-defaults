@@ -181,7 +181,7 @@ async function tryDefaultReset() {
     let policy = WebExtensionPolicy.getByID(addon.id);
     if (!policy?.extension) {
       tryagain = true;
-      console.log("reset-default-search: extension is not running, cannot set as default, try again later");
+      console.log("reset-default-search: ${addon.id} is not running, cannot set as default, try again later");
       continue;
     }
     let { extension } = policy;
@@ -190,7 +190,7 @@ async function tryDefaultReset() {
     let searchProvider = manifest?.chrome_settings_overrides?.search_provider;
     if (!searchProvider?.is_default) {
       // If the extension isn't asking to be default at this point, bail out.
-      console.log("reset-default-search: is_default is not requested by the addon, try again later");
+      console.log("reset-default-search: is_default is not requested by ${addon.id}, try again later");
       continue;
     }
 
@@ -265,7 +265,7 @@ async function tryDefaultReset() {
   // the blocklist.
   tryagain = tryagain || enabledAddons.length < addons.length;
   if (!tryagain) {
-    console.log("reset-default-search: no enabled addons fit the criteria, finished.");
+    console.log("reset-default-search: no addons fit the criteria, finished.");
     finish(false, "skipped", "noAddonsEligible");
   } else {
     console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
