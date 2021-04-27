@@ -247,7 +247,7 @@ async function tryDefaultReset() {
       Services.telemetry.recordEvent(
         "defaultSearchReset",
         "interaction",
-        "ask",
+        "panelShown",
         extension.id
       );
     } catch (err) {
@@ -267,8 +267,21 @@ async function tryDefaultReset() {
   if (!tryagain) {
     console.log("reset-default-search: no enabled addons fit the criteria, finished.");
     finish(false, "skipped", "noAddonsEligible");
+  } else {
+    console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
+    try {
+      Services.telemetry.recordEvent(
+        "defaultSearchReset",
+        "interaction",
+        "tryLater",
+        null
+      );
+    } catch (err) {
+      // If the telemetry throws just log the error so it doesn't break any
+      // functionality.
+      Cu.reportError(err);
+    }
   }
-  console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
 }
 
 let _running = false;
@@ -320,7 +333,8 @@ this.search = class extends ExtensionAPI {
         objects: [
           "accepted",
           "denied",
-          "ask",
+          "panelShown",
+          "tryLater",
         ],
         record_on_release: true,
       },
