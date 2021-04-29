@@ -112,8 +112,20 @@ const lostEngines = new Map ([
 // we will try again later.
 let tryagain = false;
 
-function finish(result = false) {
-  Services.prefs.setBoolPref(RUN_ONCE_PREF, result);
+function finish(event, reason, id = null) {
+  Services.prefs.setCharPref(RUN_ONCE_PREF, reason);
+  try {
+    Services.telemetry.recordEvent(
+      "defaultSearchReset", //category
+      event, // event
+      reason,
+      id
+    );
+  } catch (err) {
+    // If the telemetry throws just log the error so it doesn't break any
+    // functionality.
+    Cu.reportError(err);
+  }
 }
 
 async function tryDefaultReset() {
@@ -121,7 +133,7 @@ async function tryDefaultReset() {
   let defaultEngine = await Services.search.getDefault();
   if (lostEngines.has(defaultEngine?._extensionID)) {
     console.log(`reset-default-search: The default engine was already selected by the user. ${defaultEngine._extensionID}`);
-    finish(true);
+    finish("skipped", "alreadyDefault");
     return;
   }
 
@@ -139,7 +151,7 @@ async function tryDefaultReset() {
     );
   if (!addons.length) {
     console.log("reset-default-search: No addons in our list are installed.");
-    finish();
+    finish("skipped", "noAddonsEnabled");
     return;
   }
 
@@ -152,7 +164,7 @@ async function tryDefaultReset() {
   );
   if (control == "controlled_by_this_extension") {
     console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
-    finish();
+    finish("skipped", "userSelectedDefault");
     return;
   }
 
@@ -164,12 +176,12 @@ async function tryDefaultReset() {
   // loop through the list until one of them makes it to the prompt.
   enabledAddons.sort((a, b) => b.installDate - a.installDate);
   for (let addon of enabledAddons) {
-    console.log(`reset-default-search: reset search engine to ${addon.id}`);
+    console.log(`reset-default-search: attempt to reset search engine to ${addon.id}`);
 
     let policy = WebExtensionPolicy.getByID(addon.id);
     if (!policy?.extension) {
       tryagain = true;
-      console.log("reset-default-search: extension is not running, cannot set as default, try again later");
+      console.log(`reset-default-search: ${addon.id} is not running, cannot set as default, try again later`);
       continue;
     }
     let { extension } = policy;
@@ -178,7 +190,7 @@ async function tryDefaultReset() {
     let searchProvider = manifest?.chrome_settings_overrides?.search_provider;
     if (!searchProvider?.is_default) {
       // If the extension isn't asking to be default at this point, bail out.
-      console.log("reset-default-search: is_default is not requested by the addon, try again later");
+      console.log(`reset-default-search: is_default is not requested by ${addon.id}`);
       continue;
     }
 
@@ -221,20 +233,8 @@ async function tryDefaultReset() {
             );
           }
 
-          try {
-            Services.telemetry.recordEvent(
-              "defaultSearchReset",
-              "interaction",
-              "panelShown",
-              extension.id
-            );
-          } catch (err) {
-            // If the telemetry throws just log the error so it doesn't break any
-            // functionality.
-            Cu.reportError(err);
-          }
           // Remember that we have completed.
-          finish(true);
+          finish("interaction", allow ? "accepted" : "denied", extension.id);
         },
       },
     };
@@ -242,6 +242,20 @@ async function tryDefaultReset() {
       subject,
       "webextension-defaultsearch-prompt"
     );
+
+    try {
+      Services.telemetry.recordEvent(
+        "defaultSearchReset",
+        "interaction",
+        "panelShown",
+        extension.id
+      );
+    } catch (err) {
+      // If the telemetry throws just log the error so it doesn't break any
+      // functionality.
+      Cu.reportError(err);
+    }
+
     // We only prompt for the first addon that makes it here.  If the user does
     // not respond to the panel, they will be asked again on next startup.
     return;
@@ -251,10 +265,23 @@ async function tryDefaultReset() {
   // the blocklist.
   tryagain = tryagain || enabledAddons.length < addons.length;
   if (!tryagain) {
-    console.log("reset-default-search: no enabled addons fit the criteria, finished.");
-    finish();
+    console.log("reset-default-search: no addons fit the criteria, finished.");
+    finish("skipped", "noAddonsEligible");
+  } else {
+    console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
+    try {
+      Services.telemetry.recordEvent(
+        "defaultSearchReset",
+        "interaction",
+        "tryLater",
+        null
+      );
+    } catch (err) {
+      // If the telemetry throws just log the error so it doesn't break any
+      // functionality.
+      Cu.reportError(err);
+    }
   }
-  console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
 }
 
 let _running = false;
@@ -289,23 +316,38 @@ this.search = class extends ExtensionAPI {
       return;
     }
 
+    Services.telemetry.registerEvents("defaultSearchReset", {
+      skipped: {
+        methods: ["skipped"],
+        objects: [
+          "alreadyDefault",
+          "noAddonsEnabled",
+          "noAddonsEligible",
+          "previousRun",
+          "userSelectedDefault",
+        ],
+        record_on_release: true,
+      },
+      interaction: {
+        methods: ["interaction"],
+        objects: [
+          "accepted",
+          "denied",
+          "panelShown",
+          "tryLater",
+        ],
+        record_on_release: true,
+      },
+    });
+
     // Previous pref is true if the user saw the panel. Some criteria have been
     // slighly adjusted so those that did not previously see the panel will get
     // another try.
     if (Services.prefs.getBoolPref(PREVIOUS_PREF, false)) {
       console.log("reset-default-search: has already ran once and saw panel, exit.");
+      finish("skipped", "previousRun")
       return;
     }
-
-    Services.telemetry.registerEvents("defaultSearchReset", {
-      interaction: {
-        methods: ["interaction"],
-        objects: [
-          "panelShown",
-        ],
-        record_on_release: true,
-      },
-    });
 
     // Addons have not started when "update" is emitted, so we wait for "ready" to
     // indicate the startup of an addon during the session.
