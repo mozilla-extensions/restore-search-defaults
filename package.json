@@ -1,6 +1,6 @@
 {
   "name": "reset-search-defaults",
-  "version": "1.0.6",
+  "version": "2.0.0",
   "description": "Ask the user if they would like to use a specified search engine as the default.",
   "repository": "https://github.com/mozilla-extensions/restore-search-defaults",
   "license": "MPLv2",

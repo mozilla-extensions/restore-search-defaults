@@ -176,12 +176,12 @@ async function tryDefaultReset() {
   // loop through the list until one of them makes it to the prompt.
   enabledAddons.sort((a, b) => b.installDate - a.installDate);
   for (let addon of enabledAddons) {
-    console.log(`reset-default-search: reset search engine to ${addon.id}`);
+    console.log(`reset-default-search: attempt to reset search engine to ${addon.id}`);
 
     let policy = WebExtensionPolicy.getByID(addon.id);
     if (!policy?.extension) {
       tryagain = true;
-      console.log("reset-default-search: ${addon.id} is not running, cannot set as default, try again later");
+      console.log(`reset-default-search: ${addon.id} is not running, cannot set as default, try again later`);
       continue;
     }
     let { extension } = policy;
@@ -190,7 +190,7 @@ async function tryDefaultReset() {
     let searchProvider = manifest?.chrome_settings_overrides?.search_provider;
     if (!searchProvider?.is_default) {
       // If the extension isn't asking to be default at this point, bail out.
-      console.log("reset-default-search: is_default is not requested by ${addon.id}, try again later");
+      console.log(`reset-default-search: is_default is not requested by ${addon.id}`);
       continue;
     }
 
