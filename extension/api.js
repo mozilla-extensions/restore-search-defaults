@@ -112,8 +112,8 @@ const lostEngines = new Map ([
 // we will try again later.
 let tryagain = false;
 
-function finish(result, event, reason, id = null) {
-  Services.prefs.setBoolPref(RUN_ONCE_PREF, result);
+function finish(event, reason, id = null) {
+  Services.prefs.setCharPref(RUN_ONCE_PREF, reason);
   try {
     Services.telemetry.recordEvent(
       "defaultSearchReset", //category
@@ -133,7 +133,7 @@ async function tryDefaultReset() {
   let defaultEngine = await Services.search.getDefault();
   if (lostEngines.has(defaultEngine?._extensionID)) {
     console.log(`reset-default-search: The default engine was already selected by the user. ${defaultEngine._extensionID}`);
-    finish(true, "skipped", "alreadyDefault");
+    finish("skipped", "alreadyDefault");
     return;
   }
 
@@ -151,7 +151,7 @@ async function tryDefaultReset() {
     );
   if (!addons.length) {
     console.log("reset-default-search: No addons in our list are installed.");
-    finish(false, "skipped", "noAddonsEnabled");
+    finish("skipped", "noAddonsEnabled");
     return;
   }
 
@@ -164,7 +164,7 @@ async function tryDefaultReset() {
   );
   if (control == "controlled_by_this_extension") {
     console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
-    finish(false, "skipped", "userSelectedDefault");
+    finish("skipped", "userSelectedDefault");
     return;
   }
 
@@ -234,7 +234,7 @@ async function tryDefaultReset() {
           }
 
           // Remember that we have completed.
-          finish(true, "interaction", allow ? "accepted" : "denied", extension.id);
+          finish("interaction", allow ? "accepted" : "denied", extension.id);
         },
       },
     };
@@ -266,7 +266,7 @@ async function tryDefaultReset() {
   tryagain = tryagain || enabledAddons.length < addons.length;
   if (!tryagain) {
     console.log("reset-default-search: no addons fit the criteria, finished.");
-    finish(false, "skipped", "noAddonsEligible");
+    finish("skipped", "noAddonsEligible");
   } else {
     console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
     try {
@@ -345,7 +345,7 @@ this.search = class extends ExtensionAPI {
     // another try.
     if (Services.prefs.getBoolPref(PREVIOUS_PREF, false)) {
       console.log("reset-default-search: has already ran once and saw panel, exit.");
-      finish(false, "skipped", "previousRun")
+      finish("skipped", "previousRun")
       return;
     }
 
