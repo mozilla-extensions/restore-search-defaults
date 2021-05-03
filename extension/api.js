@@ -156,17 +156,18 @@ async function tryDefaultReset() {
   }
 
   // Make sure the setting is not user controlled.
-  await ExtensionSettingsStore.initialize();
-  let control = await ExtensionSettingsStore.getLevelOfControl(
-    ExtensionSettingsStore.SETTING_USER_SET,
-    DEFAULT_SEARCH_STORE_TYPE,
-    DEFAULT_SEARCH_SETTING_NAME
-  );
-  if (control == "controlled_by_this_extension") {
-    console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
-    finish("skipped", "userSelectedDefault");
-    return;
-  }
+  // Skipp for V2.0
+  // await ExtensionSettingsStore.initialize();
+  // let control = await ExtensionSettingsStore.getLevelOfControl(
+  //   ExtensionSettingsStore.SETTING_USER_SET,
+  //   DEFAULT_SEARCH_STORE_TYPE,
+  //   DEFAULT_SEARCH_SETTING_NAME
+  // );
+  // if (control == "controlled_by_this_extension") {
+  //   console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
+  //   finish("skipped", "userSelectedDefault");
+  //   return;
+  // }
 
   // Filter out any that are blocklisted.
   let enabledAddons = addons.filter(a => !a.appDisabled);
