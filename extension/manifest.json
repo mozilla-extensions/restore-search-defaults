@@ -10,13 +10,18 @@
   "version": "2.0.0",
   "description": "Ask the user if they would like to use a specified search engine as the default.",
   "experiment_apis": {
-    "search": {
+    "searchDefaults": {
       "schema": "schema.json",
       "parent": {
         "scopes": ["addon_parent"],
         "script": "api.js",
-        "events": ["startup"]
+        "events": ["startup"],
+        "paths": [["searchDefaults"]]
       }
     }
+  },
+  "permissions": ["management"],
+  "background": {
+    "scripts": ["background.js"]
   }
 }

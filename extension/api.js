@@ -105,12 +105,8 @@ const lostEngines = new Map ([
   ["{39790485-930b-40a5-8268-69222363ff80}", Oct2020],
   ["{446c7519-9e32-4f9a-b562-447f4421ec9a}", Oct2020],
   ["{b30e775a-7a10-480d-ace4-761b9ca07aee}", Dec2020],  // Test add-on
-  // ["{fd299ce1-1602-4490-b659-f45504f9324c}", Date.now()], // Manual test addon for dev.
+  ["{fd299ce1-1602-4490-b659-f45504f9324c}", Date.now()], // Manual test addon for dev.
 ]);
-
-// If the extension is not running or enabled in the search service
-// we will try again later.
-let tryagain = false;
 
 function finish(event, reason, id = null) {
   Services.prefs.setCharPref(RUN_ONCE_PREF, reason);
@@ -128,7 +124,104 @@ function finish(event, reason, id = null) {
   }
 }
 
-async function tryDefaultReset() {
+async function showDefaultSearchPanel(aID) {
+  let defaultEngine = await Services.search.getDefault();
+  if (lostEngines.has(defaultEngine?._extensionID)) {
+    console.log(`reset-default-search: The default engine was already selected by the user. ${defaultEngine._extensionID}`);
+    finish("skipped", "alreadyDefault");
+    return;
+  }
+
+  let policy = WebExtensionPolicy.getByID(aID);
+  if (!policy?.extension) {
+    console.log(`reset-default-search: ${aID} is not running, cannot set as default, try again later`);
+    return;
+  }
+  let { extension } = policy;
+  let { manifest } = extension;
+
+  let searchProvider = manifest?.chrome_settings_overrides?.search_provider;
+  if (!searchProvider?.is_default) {
+    // If the extension isn't asking to be default at this point, bail out.
+    console.log(`reset-default-search: is_default is not requested by ${aID} ${JSON.stringify(manifest)}`);
+    return false;
+  }
+
+  let engineName = searchProvider.name.trim();
+  try {
+
+  console.log(`reset-default-search: ask user to set default search engine to ${aID} ${engineName}`);
+  let window = BrowserWindowTracker.getTopWindow({ allowPopups: false });
+  let subject = {
+    wrappedJSObject: {
+      browser: window.gBrowser.selectedBrowser,
+      name: extension.name,
+      icon: extension.iconURL,
+      currentEngine: defaultEngine.name,
+      newEngine: engineName,
+      async respond(allow) {
+        console.log(`reset-default-search: user responded to panel with allow? ${allow}`);
+        if (allow) {
+          await ExtensionSettingsStore.initialize();
+          ExtensionSettingsStore.addSetting(
+            extension.id,
+            DEFAULT_SEARCH_STORE_TYPE,
+            DEFAULT_SEARCH_SETTING_NAME,
+            engineName,
+            () => defaultEngine.name
+          );
+          Services.search.defaultEngine = Services.search.getEngineByName(
+            engineName
+          );
+        }
+
+        // Remember that we have completed.
+        finish("interaction", allow ? "accepted" : "denied", extension.id);
+      },
+    },
+  };
+  console.log(`reset-default-search: notifyObservers`);
+  Services.obs.notifyObservers(
+    subject,
+    "webextension-defaultsearch-prompt"
+  );
+
+    Services.telemetry.recordEvent(
+      "defaultSearchReset",
+      "interaction",
+      "panelShown",
+      extension.id
+    );
+  } catch (err) {
+    // If the telemetry throws just log the error so it doesn't break any
+    // functionality.
+    Cu.reportError(err);
+  }
+}
+
+async function shouldPromptForDefault(aID) {
+  console.log(`reset-default-search: shouldPromptForDefault? ${aID}`);
+
+  let policy = WebExtensionPolicy.getByID(aID);
+  if (!policy?.extension) {
+    console.log(`reset-default-search: ${aID} is not running, cannot set as default, try again later`);
+    return false;
+  }
+  await policy.readyPromise;
+
+  let { extension } = policy;
+  let { manifest } = extension;
+
+  let searchProvider = manifest?.chrome_settings_overrides?.search_provider;
+  if (!searchProvider?.is_default) {
+    // If the extension isn't asking to be default at this point, bail out.
+    console.log(`reset-default-search: is_default is not requested by ${aID} ${JSON.stringify(manifest)}`);
+    return false;
+  }
+  return true;
+}
+
+async function getEligibleAddonIDs() {
   await searchInitialized;
   let defaultEngine = await Services.search.getDefault();
   if (lostEngines.has(defaultEngine?._extensionID)) {
@@ -155,20 +248,6 @@ async function tryDefaultReset() {
     return;
   }
 
-  // Make sure the setting is not user controlled.
-  // Skipp for V2.0
-  // await ExtensionSettingsStore.initialize();
-  // let control = await ExtensionSettingsStore.getLevelOfControl(
-  //   ExtensionSettingsStore.SETTING_USER_SET,
-  //   DEFAULT_SEARCH_STORE_TYPE,
-  //   DEFAULT_SEARCH_SETTING_NAME
-  // );
-  // if (control == "controlled_by_this_extension") {
-  //   console.log(`reset-default-search: search control has been user selected, not resetting, finished.`);
-  //   finish("skipped", "userSelectedDefault");
-  //   return;
-  // }
-
   // Filter out any that are blocklisted.
   let enabledAddons = addons.filter(a => !a.appDisabled);
   console.log(`reset-default-search: enabled and eligible addons ${enabledAddons.length}`);
@@ -176,146 +255,12 @@ async function tryDefaultReset() {
   // We will only ask for the latest installed engine.  We will
   // loop through the list until one of them makes it to the prompt.
   enabledAddons.sort((a, b) => b.installDate - a.installDate);
-  for (let addon of enabledAddons) {
-    console.log(`reset-default-search: attempt to reset search engine to ${addon.id}`);
-
-    let policy = WebExtensionPolicy.getByID(addon.id);
-    if (!policy?.extension) {
-      tryagain = true;
-      console.log(`reset-default-search: ${addon.id} is not running, cannot set as default, try again later`);
-      continue;
-    }
-    let { extension } = policy;
-    let { manifest } = extension;
-
-    let searchProvider = manifest?.chrome_settings_overrides?.search_provider;
-    if (!searchProvider?.is_default) {
-      // If the extension isn't asking to be default at this point, bail out.
-      console.log(`reset-default-search: is_default is not requested by ${addon.id}`);
-      continue;
-    }
-
-    let engineName = searchProvider.name.trim();
-    if (!Services.search.getEngineByName(engineName)) {
-      // attempt to load the engine, but if it fails then we'll try again later.
-      console.log(`reset-default-search: engine is not configured in search, try adding ${addon.id}`);
-      // "default" here is about the locale, not default setting.  We dig into search service here due
-      // to a bug (fixed in 89) that prevents using addEnginesFromExtension for updates.
-      await Services.search.wrappedJSObject._installExtensionEngine(extension, ["default"]);
-      if (!Services.search.getEngineByName(engineName)) {
-        tryagain = true;
-        console.log(`reset-default-search: could not configure ${addon.id} in search, try again later`);
-        continue;
-      }
-    }
-
-    console.log(`reset-default-search: ask user to set default search engine to ${addon.id}`);
-    let window = BrowserWindowTracker.getTopWindow({ allowPopups: false });
-    let subject = {
-      wrappedJSObject: {
-        browser: window.gBrowser.selectedBrowser,
-        name: extension.name,
-        icon: extension.iconURL,
-        currentEngine: defaultEngine.name,
-        newEngine: engineName,
-        async respond(allow) {
-          console.log(`reset-default-search: user responded to panel with allow? ${allow}`);
-          if (allow) {
-            await ExtensionSettingsStore.initialize();
-            ExtensionSettingsStore.addSetting(
-              extension.id,
-              DEFAULT_SEARCH_STORE_TYPE,
-              DEFAULT_SEARCH_SETTING_NAME,
-              engineName,
-              () => defaultEngine.name
-            );
-            Services.search.defaultEngine = Services.search.getEngineByName(
-              engineName
-            );
-          }
-
-          // Remember that we have completed.
-          finish("interaction", allow ? "accepted" : "denied", extension.id);
-        },
-      },
-    };
-    Services.obs.notifyObservers(
-      subject,
-      "webextension-defaultsearch-prompt"
-    );
-
-    try {
-      Services.telemetry.recordEvent(
-        "defaultSearchReset",
-        "interaction",
-        "panelShown",
-        extension.id
-      );
-    } catch (err) {
-      // If the telemetry throws just log the error so it doesn't break any
-      // functionality.
-      Cu.reportError(err);
-    }
-
-    // We only prompt for the first addon that makes it here.  If the user does
-    // not respond to the panel, they will be asked again on next startup.
-    return;
-  }
-  // If we made it here, no addon was currently eligible.  If any addons were
-  // blocklisted we will want to be able to prompt when it is released from
-  // the blocklist.
-  tryagain = tryagain || enabledAddons.length < addons.length;
-  if (!tryagain) {
-    console.log("reset-default-search: no addons fit the criteria, finished.");
-    finish("skipped", "noAddonsEligible");
-  } else {
-    console.log("reset-default-search: no enabled addons fit the criteria, waiting for more updates.");
-    try {
-      Services.telemetry.recordEvent(
-        "defaultSearchReset",
-        "interaction",
-        "tryLater",
-        null
-      );
-    } catch (err) {
-      // If the telemetry throws just log the error so it doesn't break any
-      // functionality.
-      Cu.reportError(err);
-    }
-  }
+  return enabledAddons;
 }
 
-let _running = false;
-function runDefaultReset() {
-  if (_running) {
-    return;
-  }
-  _running = true;
-  tryDefaultReset()
-    .then(() => {
-      if (!tryagain) {
-        Management.off("ready", tryUpdate);
-      }
-    }).finally(() => {
-      _running = false;
-    });
-}
-
-function tryUpdate(e, { id }) {
-  if (lostEngines.has(id)) {
-    runDefaultReset();
-  }
-}
-
-this.search = class extends ExtensionAPI {
+this.searchDefaults = class extends ExtensionAPI {
   onStartup() {
-    console.log("reset-default-search: starting.");
-
-    // We only run this once, after which we bail out.
-    if (Services.prefs.prefHasUserValue(RUN_ONCE_PREF)) {
-      console.log("reset-default-search: has already ran once, exit.");
-      return;
-    }
+    console.log(`reset-default-search: starting.`);
 
     Services.telemetry.registerEvents("defaultSearchReset", {
       skipped: {
@@ -343,20 +288,38 @@ this.search = class extends ExtensionAPI {
 
     // Previous pref is true if the user saw the panel. Some criteria have been
     // slighly adjusted so those that did not previously see the panel will get
-    // another try.
+    // another try.  This sets a telemetry event so we know.
     if (Services.prefs.getBoolPref(PREVIOUS_PREF, false)) {
       console.log("reset-default-search: has already ran once and saw panel, exit.");
       finish("skipped", "previousRun")
       return;
     }
-
-    // Addons have not started when "update" is emitted, so we wait for "ready" to
-    // indicate the startup of an addon during the session.
-    Management.on("ready", tryUpdate);
-    runDefaultReset();
   }
 
-  onShutdown() {
-    Management.off("ready", tryUpdate);
+  getAPI(context) {
+    let previousRun = Services.prefs.getBoolPref(PREVIOUS_PREF, false);
+    return {
+      searchDefaults: {
+        async getEligibleAddonID() {
+          let enabledAddons = await getEligibleAddonIDs();
+          return enabledAddons?.length ? enabledAddons[0].id : null;
+        },
+        deactivatedDate(id) {
+          return lostEngines.get(id);
+        },
+        wasPrompted() {
+          return !previousRun && Services.prefs.getBoolPref(RUN_ONCE_PREF, false);
+        },
+        shouldPrompt(id) {
+          if (previousRun || Services.prefs.getBoolPref(RUN_ONCE_PREF, false) || !lostEngines.has(id)) {
+            return false;
+          }
+          return shouldPromptForDefault(id);
+        },
+        prompt(id) {
+          showDefaultSearchPanel(id);
+        }
+      },
+    };
   }
 };

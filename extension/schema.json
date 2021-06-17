@@ -1,1 +1,44 @@
-[]
+[
+  {
+    "namespace": "searchDefaults",
+    "types": [
+      {
+        "id": "Meh",
+        "type": "object",
+        "properties": {}
+      }
+    ],
+    "functions": [
+      {
+        "name": "getEligibleAddonID",
+        "type": "function",
+        "async": true,
+        "parameters": []
+      },
+      {
+        "name": "deactivatedDate",
+        "type": "function",
+        "async": true,
+        "parameters": [{ "name": "id", "type": "string" }]
+      },
+      {
+        "name": "wasPrompted",
+        "type": "function",
+        "async": true,
+        "parameters": []
+      },
+      {
+        "name": "shouldPrompt",
+        "type": "function",
+        "async": true,
+        "parameters": [{ "name": "id", "type": "string" }]
+      },
+      {
+        "name": "prompt",
+        "type": "function",
+        "async": true,
+        "parameters": [{ "name": "id", "type": "string" }]
+      }
+    ]
+  }
+]
