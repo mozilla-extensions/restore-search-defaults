@@ -37,7 +37,6 @@ async function initialize() {
       browser.management.onEnabled.removeListener(listener);
     }
     if (wasDisabled.indexOf(info.id) < 0 || !browser.searchDefaults.shouldPrompt(info.id)) {
-      console.log(`shouldprompt id ${info.id}`);
       return;
     }
     showPage(info);

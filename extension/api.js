@@ -47,8 +47,8 @@ const DEFAULT_SEARCH_SETTING_NAME = "defaultSearch";
 // If the value exists, we have ran before and will not run again.  If
 // we showed the panel, the value will be true.  We do not track what
 // the result of showing the panel is (ie. the user accepted or not).
-const PREVIOUS_PREF = "extensions.reset_default_search.runonce.3";
-const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.4";
+const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.3";
+const REASON_PREF = "extensions.reset_default_search.runonce.reason";
 
 // Basic testing:
 //
@@ -64,8 +64,8 @@ const RUN_ONCE_PREF = "extensions.reset_default_search.runonce.4";
 // Variants to testing:
 // A. Install reset addon prior to updating to non-blocklisted addon
 // B. Install reset addon after updating to non-blocklisted addon
-// C. Set PREVIOUS_PREF to false before step 6 (using A OR B otherwise)
-// D. Set PREVIOUS_PREF to true before step 6 (using A OR B otherwise)
+// C. Set RUN_ONCE_PREF to false before step 6 (using A OR B otherwise)
+// D. Set RUN_ONCE_PREF to true before step 6 (using A OR B otherwise)
 //    * we do not expect the prompt at step 7, addon should not be set to default
 //
 // The blocked addon will have always been installed prior to the reset addon, so
@@ -109,7 +109,9 @@ const lostEngines = new Map ([
 ]);
 
 function finish(event, reason, id = null) {
-  Services.prefs.setCharPref(RUN_ONCE_PREF, reason);
+  // Store the reason for debugging purposes.
+  Services.prefs.setCharPref(REASON_PREF, reason);
+  Services.prefs.setBoolPref(RUN_ONCE_PREF, true);
   try {
     Services.telemetry.recordEvent(
       "defaultSearchReset", //category
@@ -244,7 +246,7 @@ async function getEligibleAddonIDs() {
     );
   if (!addons.length) {
     console.log("reset-default-search: No addons in our list are installed.");
-    finish("skipped", "noAddonsEnabled");
+    finish("skipped", "noAddonsEligible");
     return;
   }
 
@@ -267,10 +269,8 @@ this.searchDefaults = class extends ExtensionAPI {
         methods: ["skipped"],
         objects: [
           "alreadyDefault",
-          "noAddonsEnabled",
           "noAddonsEligible",
           "previousRun",
-          "userSelectedDefault",
         ],
         record_on_release: true,
       },
@@ -280,7 +280,6 @@ this.searchDefaults = class extends ExtensionAPI {
           "accepted",
           "denied",
           "panelShown",
-          "tryLater",
         ],
         record_on_release: true,
       },
@@ -289,7 +288,7 @@ this.searchDefaults = class extends ExtensionAPI {
     // Previous pref is true if the user saw the panel. Some criteria have been
     // slighly adjusted so those that did not previously see the panel will get
     // another try.  This sets a telemetry event so we know.
-    if (Services.prefs.getBoolPref(PREVIOUS_PREF, false)) {
+    if (Services.prefs.getBoolPref(RUN_ONCE_PREF, false)) {
       console.log("reset-default-search: has already ran once and saw panel, exit.");
       finish("skipped", "previousRun")
       return;
@@ -297,10 +296,12 @@ this.searchDefaults = class extends ExtensionAPI {
   }
 
   getAPI(context) {
-    let previousRun = Services.prefs.getBoolPref(PREVIOUS_PREF, false);
     return {
       searchDefaults: {
         async getEligibleAddonID() {
+          if (Services.prefs.getBoolPref(RUN_ONCE_PREF, false)) {
+            return;
+          }
           let enabledAddons = await getEligibleAddonIDs();
           return enabledAddons?.length ? enabledAddons[0].id : null;
         },
@@ -308,10 +309,10 @@ this.searchDefaults = class extends ExtensionAPI {
           return lostEngines.get(id);
         },
         wasPrompted() {
-          return !previousRun && Services.prefs.getBoolPref(RUN_ONCE_PREF, false);
+          return !Services.prefs.getBoolPref(RUN_ONCE_PREF, false);
         },
         shouldPrompt(id) {
-          if (previousRun || Services.prefs.getBoolPref(RUN_ONCE_PREF, false) || !lostEngines.has(id)) {
+          if (Services.prefs.getBoolPref(RUN_ONCE_PREF, false) || !lostEngines.has(id)) {
             return false;
           }
           return shouldPromptForDefault(id);
