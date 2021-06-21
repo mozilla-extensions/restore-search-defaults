@@ -1,16 +1,9 @@
 [
   {
     "namespace": "searchDefaults",
-    "types": [
-      {
-        "id": "Meh",
-        "type": "object",
-        "properties": {}
-      }
-    ],
     "functions": [
       {
-        "name": "getEligibleAddonID",
+        "name": "getEligibleAddonIDs",
         "type": "function",
         "async": true,
         "parameters": []
@@ -38,6 +31,18 @@
         "type": "function",
         "async": true,
         "parameters": [{ "name": "id", "type": "string" }]
+      }
+    ],
+    "events": [
+      {
+        "name": "onReady",
+        "type": "function",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string"
+          }
+        ]
       }
     ]
   }
