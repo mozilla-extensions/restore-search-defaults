@@ -24,14 +24,16 @@ function createLink(text, href) {
 }
 
 let addonData;
-browser.runtime.onMessage.addListener(async (data) => {
-  console.log(JSON.stringify(data));
-  addonData = data;
+window.onload = async () => {
+  let params = new URLSearchParams(window.location.search);
+
+  addonData = await browser.management.get(params.get("id"));
+  console.log(JSON.stringify(addonData));
   for (let el of document.getElementsByClassName("addon-name")) {
-    el.appendChild(document.createTextNode(data.name));
+    el.appendChild(document.createTextNode(addonData.name));
   };
   let description = document.getElementsByClassName("addon-description");
-  let blocks = data.description.split("\n");
+  let blocks = addonData.description.split("\n");
   for (let tn of blocks) {
     currentDiv = document.createElement("div");
     linkify(tn, { callback: createLink });
@@ -40,7 +42,7 @@ browser.runtime.onMessage.addListener(async (data) => {
   }
 
   // Add the disabled date
-  let date = await browser.searchDefaults.deactivatedDate(data.id);
+  let date = await browser.searchDefaults.deactivatedDate(addonData.id);
   let text = new Intl.DateTimeFormat('en-US', {month: "long", year: "numeric"}).format(new Date(date));
   let dateEl = document.getElementsByClassName("addon-date");
   dateEl[0].appendChild(document.createTextNode(text));
@@ -54,7 +56,7 @@ browser.runtime.onMessage.addListener(async (data) => {
     }
   }
   icons[0].setAttribute("src", iconSrc);
-});
+};
 
 document.getElementById("resetSearch").addEventListener("click", event => {
   console.log(`show prompt for ${addonData.id}`);

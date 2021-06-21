@@ -223,6 +223,7 @@ async function shouldPromptForDefault(aID) {
   return true;
 }
 
+// Returns a list of currently installed addons that are in the lostEngines list.
 async function getEligibleAddonIDs() {
   await searchInitialized;
   let defaultEngine = await Services.search.getDefault();
@@ -249,15 +250,7 @@ async function getEligibleAddonIDs() {
     finish("skipped", "noAddonsEligible");
     return;
   }
-
-  // Filter out any that are blocklisted.
-  let enabledAddons = addons.filter(a => !a.appDisabled);
-  console.log(`reset-default-search: enabled and eligible addons ${enabledAddons.length}`);
-
-  // We will only ask for the latest installed engine.  We will
-  // loop through the list until one of them makes it to the prompt.
-  enabledAddons.sort((a, b) => b.installDate - a.installDate);
-  return enabledAddons;
+  return addons;
 }
 
 this.searchDefaults = class extends ExtensionAPI {
@@ -296,20 +289,26 @@ this.searchDefaults = class extends ExtensionAPI {
   }
 
   getAPI(context) {
+    let EventManager = ExtensionCommon.EventManager;
+
     return {
       searchDefaults: {
-        async getEligibleAddonID() {
+        async getEligibleAddonIDs() {
           if (Services.prefs.getBoolPref(RUN_ONCE_PREF, false)) {
             return;
           }
-          let enabledAddons = await getEligibleAddonIDs();
-          return enabledAddons?.length ? enabledAddons[0].id : null;
+          let addons = await getEligibleAddonIDs();
+          if (!addons?.length) {
+            return;
+          }
+          addons.sort((a, b) => b.installDate - a.installDate);
+          return addons.map(a => { return { id: a.id, enabled: !a.appDisabled } });
         },
         deactivatedDate(id) {
           return lostEngines.get(id);
         },
         wasPrompted() {
-          return !Services.prefs.getBoolPref(RUN_ONCE_PREF, false);
+          return Services.prefs.getBoolPref(RUN_ONCE_PREF, false);
         },
         shouldPrompt(id) {
           if (Services.prefs.getBoolPref(RUN_ONCE_PREF, false) || !lostEngines.has(id)) {
@@ -319,7 +318,24 @@ this.searchDefaults = class extends ExtensionAPI {
         },
         prompt(id) {
           showDefaultSearchPanel(id);
-        }
+        },
+
+        onReady: new EventManager({
+          context,
+          name: "searchDefaults.onReady",
+          register: fire => {
+            let listener = (event, data) => {
+              if (lostEngines.has(data.id)) {
+                fire.async(data.id);
+              }
+            };
+            Management.on("ready", listener);
+            return () => {
+              Management.off("ready", listener);
+            };
+          },
+        }).api(),
+
       },
     };
   }

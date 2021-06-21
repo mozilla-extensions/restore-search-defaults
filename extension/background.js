@@ -1,48 +1,54 @@
+"use strict";
 
+let lastTabID;
 
-function showPage(info) {
-  function tabListener(tabId, changeInfo, tab) {
-    if (changeInfo.status == "complete" && tab.url == browser.runtime.getURL("searchdefault.html")) {
-      browser.tabs.sendMessage(tabId, info);
-      browser.tabs.onUpdated.removeListener(tabListener);
+async function showPage(info) {
+  // If we previously opened a tab, reuse it.
+  if (lastTabID !== undefined) {
+    let tab = await browser.tabs.get(lastTabID).catch();
+    if (tab) {
+      await browser.tabs.update({ active: true, url: `searchdefault.html?id=${info.id}` });
+      return;
     }
   }
-  browser.tabs.onUpdated.addListener(tabListener);
-  browser.tabs.create({ url: "searchdefault.html" });
-}
-
-async function runStartup() {
-  // Check for eligible addon on startup
-  let id = await browser.searchDefaults.getEligibleAddonID();
-  console.log(`got back an eligible addon id ${id}`);
-  if (!id) {
-    return;
-  }
-  let info = await browser.management.get(id);
-  showPage(info);
+  let tab = await browser.tabs.create({ url: `searchdefault.html?id=${info.id}` });
+  lastTabID = tab.id;
 }
 
 async function initialize() {
-  runStartup();
+  let addons = await browser.searchDefaults.getEligibleAddonIDs();
+  if (!addons?.length) {
+    // If there are no potentially elligble addons, exit early.
+    return;
+  }
 
-  // management api doesn't have a install reason, so we need
-  // to ensure we only operate on currently installed and disabled
-  // addons.
-  let addons = await browser.management.getAll();
+  // See if we have an enabled addon we can use now. We still
+  // listen for for other enabled addons in case the page was
+  // not reacted to.
+  let enabled = addons.filter(a => a.enabled);
+  if (enabled?.length) {
+    showPage(enabled[0]);
+  }
+
   let wasDisabled = addons.filter(a => !a.enabled).map(a => a.id);
+  if (!wasDisabled?.length) {
+    // If there are no potentially elligble addons, exit early.
+    return;
+  }
 
-  async function listener(info) {
+  async function listener(id) {
     let prompted = await browser.searchDefaults.wasPrompted();
     if (prompted) {
-      browser.management.onEnabled.removeListener(listener);
+      browser.searchDefaults.onReady.removeListener(listener);
     }
-    if (wasDisabled.indexOf(info.id) < 0 || !browser.searchDefaults.shouldPrompt(info.id)) {
+    if (wasDisabled.indexOf(id) < 0 || !(await browser.searchDefaults.shouldPrompt(id))) {
+      console.log(`addon ${id} is not eligible`);
       return;
     }
-    showPage(info);
+    showPage({ id });
   }
   // Listen for management updates
-  browser.management.onEnabled.addListener(listener);
+  browser.searchDefaults.onReady.addListener(listener);
 }
 
 initialize();
