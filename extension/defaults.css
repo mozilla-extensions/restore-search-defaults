@@ -26,6 +26,10 @@ body {
   margin: 4px 8px;
 }
 
+.icon {
+  max-width: 48px;
+}
+
 .addon-description > div {
   padding: 4px 16px 4px 80px;
 }
@@ -41,19 +45,31 @@ body {
 button {
   margin-left: 16px;
   float: right;
-  color: white;
-  background: #0060df;
+  background: rgba(12, 12, 13, 0.1);
   border: none;
   border-radius: 4px;
   padding: 16px;
   height: 48px;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 button:hover {
-  background: #003eaa;
+  background: rgba(12, 12, 13, 0.2);
 }
 
 button:active {
+  background: rgba(12, 12, 13, 0.3);
+}
+
+button[primary="true"] {
+  color: white;
+  background: #0060df;
+}
+
+button:hover[primary="true"] {
+  background: #003eaa;
+}
+
+button:active[primary="true"] {
   background: #002275;
 }

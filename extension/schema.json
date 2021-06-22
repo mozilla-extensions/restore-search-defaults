@@ -27,10 +27,16 @@
         "parameters": [{ "name": "id", "type": "string" }]
       },
       {
-        "name": "prompt",
+        "name": "prompted",
         "type": "function",
         "async": true,
         "parameters": [{ "name": "id", "type": "string" }]
+      },
+      {
+        "name": "promptResult",
+        "type": "function",
+        "async": true,
+        "parameters": [{ "name": "id", "type": "string" }, { "name": "accept", "type": "boolean" }]
       }
     ],
     "events": [
