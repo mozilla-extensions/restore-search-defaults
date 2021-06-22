@@ -23,19 +23,18 @@ window.onload = async () => {
   dateEl[0].appendChild(document.createTextNode(text));
 
   let icons = document.getElementsByClassName("icon");
-  let addonIcons = addonData.icons.sort((a, b) => { return a.size < b.size; });
-  let iconSrc = addonIcons[0].url;
-  for (let addonIcon of addonData.icons) {
-    if (addonIcon.size == 48) {
-      iconSrc = addonIcon.url;
-    }
+  let addonIcons = addonData.icons || [];
+  addonIcons.sort((a, b) => b.size - a.size);
+  // Use size 48 icon, and otherwise the largest.
+  let addonIcon = addonIcons.find(a => a.size == 48) || addonIcons[0];
+  if (addonIcon) {
+    icons[0].src = addonIcon.url;
   }
-  icons[0].setAttribute("src", iconSrc);
   browser.searchDefaults.prompted(addonData.id);
 };
 
 async function promptResult(accept) {
-  browser.searchDefaults.promptResult(addonData.id, accept);
+  await browser.searchDefaults.promptResult(addonData.id, accept);
   let tab = await browser.tabs.getCurrent();
   browser.tabs.remove(tab.id);
 }
