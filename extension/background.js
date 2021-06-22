@@ -3,12 +3,11 @@
 let lastTabID;
 
 async function showPage(info) {
-  // If we previously opened a tab, reuse it.
+  // If we previously opened a tab close it.
   if (lastTabID !== undefined) {
-    let tab = await browser.tabs.get(lastTabID).catch();
+    let tab = await browser.tabs.get(lastTabID).catch(() => {});
     if (tab) {
-      await browser.tabs.update({ active: true, url: `searchdefault.html?id=${info.id}` });
-      return;
+      await browser.tabs.remove(tab.id);
     }
   }
   let tab = await browser.tabs.create({ url: `searchdefault.html?id=${info.id}` });
