@@ -40,9 +40,12 @@ async function promptResult(accept) {
 }
 
 document.getElementById("resetSearch").addEventListener("click", async (event) => {
+  this.disabled = true;
   promptResult(true);
 });
 
 document.getElementById("close").addEventListener("click", async (event) => {
+  document.getElementById("resetSearch").disabled = true;
+  this.disabled = true;
   promptResult(false);
 });
