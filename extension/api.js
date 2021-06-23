@@ -283,7 +283,14 @@ this.searchDefaults = class extends ExtensionAPI {
             console.log(`reset-default-search: engine is not configured in search, try adding ${id}`);
             // "default" here is about the locale, not default setting.  We dig into search service here due
             // to a bug (fixed in 89) that prevents using addEnginesFromExtension for updates.
-            await Services.search.wrappedJSObject._installExtensionEngine(extension, ["default"]);
+
+            try {
+              await Services.search.wrappedJSObject._installExtensionEngine(extension, ["default"]);
+            } catch (e) {
+              console.log(`reset-default-search: could not configure ${id} in search, try again later: ${e}`);
+              return;
+            }
+
             if (!Services.search.getEngineByName(engineName)) {
               console.log(`reset-default-search: could not configure ${id} in search, try again later`);
               return;
