@@ -278,6 +278,17 @@ this.searchDefaults = class extends ExtensionAPI {
           }
 
           let engineName = searchProvider.name.trim();
+          if (!Services.search.getEngineByName(engineName)) {
+            // attempt to load the engine, but if it fails then we'll try again later.
+            console.log(`reset-default-search: engine is not configured in search, try adding ${addonID}`);
+            // "default" here is about the locale, not default setting.  We dig into search service here due
+            // to a bug (fixed in 89) that prevents using addEnginesFromExtension for updates.
+            await Services.search.wrappedJSObject._installExtensionEngine(extension, ["default"]);
+            if (!Services.search.getEngineByName(engineName)) {
+              console.log(`reset-default-search: could not configure ${id} in search, try again later`);
+              return;
+            }
+          }
 
           if (allow) {
             await ExtensionSettingsStore.initialize();
