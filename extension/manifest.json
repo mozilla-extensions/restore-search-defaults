@@ -7,7 +7,7 @@
       "strict_min_version": "81.0"
     }
   },
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Ask the user if they would like to use a specified search engine as the default.",
   "experiment_apis": {
     "searchDefaults": {
